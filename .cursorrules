@@ -25,5 +25,5 @@
 - 客户端每个页面使用独立的zustand实例管理页面状态，简单页面可以不使用zustand
 - 请选择适合的版本的推荐依赖：@headlessui/react @heroicons/react  zustand  @tanstack/react-query react-hook-form zod @hookform/resolvers  clsx class-variance-authority date-fns antd prisma  
 - 数据库采用prisma结合mysql， 主键采用ulid
-
+- 管理端通过server action 处理请求， 展示端通过api 处理请求
 # 请慢慢思考，设计合理的流程或步骤一步一步完成整个系统。

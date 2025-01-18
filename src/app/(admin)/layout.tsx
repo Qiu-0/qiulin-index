@@ -4,8 +4,11 @@ import { useEffect, useState } from "react"
 import { Layout, Menu, theme } from "antd"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 
 const { Header, Content, Sider } = Layout
+
+const queryClient = new QueryClient()
 
 const menuItems = [
   {
@@ -69,53 +72,55 @@ export default function AdminLayout({
 
   // 如果是登录页面，不显示管理布局
   if (pathname === "/login") {
-    return children
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   }
 
   return (
-    <Layout style={{ minHeight: "100vh" }}>
-      <Header style={{ display: "flex", alignItems: "center", padding: "0 24px" }}>
-        <div style={{ color: "#fff", fontSize: "18px", fontWeight: "bold" }}>
-          博客管理系统
-        </div>
-        <Link 
-          href="/" 
-          style={{ 
-            marginLeft: "auto", 
-            color: "#fff",
-            fontSize: "14px",
-            textDecoration: "none"
-          }}
-        >
-          返回首页
-        </Link>
-      </Header>
-      <Layout>
-        <Sider width={200}>
-          <Menu
-            mode="inline"
-            selectedKeys={selectedKeys}
-            style={{ height: "100%", borderRight: 0 }}
-            items={menuItems.map(item => ({
-              key: item.key,
-              label: <Link href={item.path}>{item.label}</Link>,
-            }))}
-          />
-        </Sider>
-        <Layout style={{ padding: "24px" }}>
-          <Content
-            style={{
-              padding: 24,
-              margin: 0,
-              minHeight: 280,
-              background: colorBgContainer,
-              borderRadius: borderRadiusLG,
+    <QueryClientProvider client={queryClient}>
+      <Layout style={{ minHeight: "100vh" }}>
+        <Header style={{ display: "flex", alignItems: "center", padding: "0 24px" }}>
+          <div style={{ color: "#fff", fontSize: "18px", fontWeight: "bold" }}>
+            博客管理系统
+          </div>
+          <Link 
+            href="/" 
+            style={{ 
+              marginLeft: "auto", 
+              color: "#fff",
+              fontSize: "14px",
+              textDecoration: "none"
             }}
           >
-            {children}
-          </Content>
+            返回首页
+          </Link>
+        </Header>
+        <Layout>
+          <Sider width={200}>
+            <Menu
+              mode="inline"
+              selectedKeys={selectedKeys}
+              style={{ height: "100%", borderRight: 0 }}
+              items={menuItems.map(item => ({
+                key: item.key,
+                label: <Link href={item.path}>{item.label}</Link>,
+              }))}
+            />
+          </Sider>
+          <Layout style={{ padding: "24px" }}>
+            <Content
+              style={{
+                padding: 24,
+                margin: 0,
+                minHeight: 280,
+                background: colorBgContainer,
+                borderRadius: borderRadiusLG,
+              }}
+            >
+              {children}
+            </Content>
+          </Layout>
         </Layout>
       </Layout>
-    </Layout>
+    </QueryClientProvider>
   )
 } 

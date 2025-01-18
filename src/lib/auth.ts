@@ -1,71 +1,78 @@
-import { NextAuthOptions } from 'next-auth'
-import { PrismaAdapter } from '@auth/prisma-adapter'
-import { prisma } from './prisma'
-import CredentialsProvider from 'next-auth/providers/credentials'
-import { compare } from 'bcryptjs'
+import { cookies } from 'next/headers'
+import { SignJWT, jwtVerify } from 'jose'
+import { NextRequest } from 'next/server'
 
-export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma) as any,
-  session: {
-    strategy: 'jwt',
-  },
-  pages: {
-    signIn: '/login',
-  },
-  providers: [
-    CredentialsProvider({
-      name: 'credentials',
-      credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null
-        }
+const secretKey = new TextEncoder().encode(process.env.JWT_SECRET_KEY)
+const key = {
+  kty: 'oct',
+  k: process.env.JWT_SECRET_KEY,
+}
 
-        const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email,
-          },
-        })
+export async function encrypt(payload: any) {
+  return await new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('1d')
+    .sign(secretKey)
+}
 
-        if (!user) {
-          return null
-        }
+export async function decrypt(input: string): Promise<any> {
+  const { payload } = await jwtVerify(input, secretKey, {
+    algorithms: ['HS256'],
+  })
+  return payload
+}
 
-        const isPasswordValid = await compare(credentials.password, user.password)
+export async function login(username: string, password: string) {
+  console.log(process.env.ADMIN_USERNAME, process.env.ADMIN_PASSWORD, username, password)
+  // 验证用户名和密码是否匹配环境变量中的配置
+  if (
+    username === process.env.ADMIN_USERNAME &&
+    password === process.env.ADMIN_PASSWORD
+  ) {
+    // 创建一个不包含敏感信息的 token
+    const token = await encrypt({ authenticated: true })
+    console.log(token)
+    // 设置 cookie
+    cookies().set('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+    })
+    
+    return true
+  }
+  return false
+}
 
-        if (!isPasswordValid) {
-          return null
-        }
+export async function logout() {
+  cookies().delete('token')
+}
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        }
-      },
-    }),
-  ],
-  callbacks: {
-    session: ({ session, token }) => {
-      return {
-        ...session,
-        user: {
-          ...session.user,
-          id: token.id,
-        },
-      }
-    },
-    jwt: ({ token, user }) => {
-      if (user) {
-        return {
-          ...token,
-          id: user.id,
-        }
-      }
-      return token
-    },
-  },
+export async function getAuthStatus() {
+  const token = cookies().get('token')
+  if (!token) return false
+  
+  try {
+    await decrypt(token.value)
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function validateRequest(request: NextRequest) {
+  const token = request.cookies.get('token')
+  
+  if (!token) {
+    return false
+  }
+  
+  try {
+    await decrypt(token.value)
+    return true
+  } catch {
+    return false
+  }
 } 

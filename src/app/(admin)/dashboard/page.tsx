@@ -2,8 +2,19 @@
 
 import { Card, Col, Row, Statistic } from "antd"
 import { FileTextOutlined, FolderOutlined } from "@ant-design/icons"
+import { useEffect, useState } from "react"
+import { getDashboardStats } from "./actions"
 
 export default function DashboardPage() {
+  const [stats, setStats] = useState({
+    postCount: 0,
+    topicCount: 0,
+  })
+
+  useEffect(() => {
+    getDashboardStats().then(setStats)
+  }, [])
+
   return (
     <div>
       <h2 style={{ marginBottom: 24 }}>仪表盘</h2>
@@ -12,7 +23,7 @@ export default function DashboardPage() {
           <Card>
             <Statistic
               title="博客总数"
-              value={0}
+              value={stats.postCount}
               prefix={<FileTextOutlined />}
             />
           </Card>
@@ -21,7 +32,7 @@ export default function DashboardPage() {
           <Card>
             <Statistic
               title="主题总数"
-              value={0}
+              value={stats.topicCount}
               prefix={<FolderOutlined />}
             />
           </Card>

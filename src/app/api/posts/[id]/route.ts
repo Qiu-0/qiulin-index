@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import prisma from '@/lib/prisma'
 import { z } from 'zod'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { ulid } from 'ulid'
 
 const postSchema = z.object({
   title: z.string().min(1, '标题不能为空'),
@@ -20,20 +19,18 @@ export async function GET(
     const post = await prisma.post.findUnique({
       where: { id: params.id },
       include: {
-        topics: {
+        postTrees: {
           include: {
-            categories: {
-              select: {
-                id: true,
-                name: true,
+            topic: {
+              include: {
+                categories: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
               },
             },
-          },
-        },
-        author: {
-          select: {
-            id: true,
-            name: true,
           },
         },
       },
@@ -61,30 +58,14 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
     const post = await prisma.post.findUnique({
       where: { id: params.id },
-      select: { authorId: true },
     })
 
     if (!post) {
       return NextResponse.json(
         { error: 'Post not found' },
         { status: 404 }
-      )
-    }
-
-    if (post.authorId !== session.user.id) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403 }
       )
     }
 
@@ -96,25 +77,27 @@ export async function PUT(
       where: { id: params.id },
       data: {
         ...postData,
-        topics: {
-          set: topicIds ? topicIds.map(id => ({ id })) : [],
-        },
+        postTrees: topicIds ? {
+          deleteMany: {},
+          create: topicIds.map(topicId => ({
+            id: ulid(),
+            topicId,
+          })),
+        } : undefined,
       },
       include: {
-        topics: {
+        postTrees: {
           include: {
-            categories: {
-              select: {
-                id: true,
-                name: true,
+            topic: {
+              include: {
+                categories: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
               },
             },
-          },
-        },
-        author: {
-          select: {
-            id: true,
-            name: true,
           },
         },
       },
@@ -142,30 +125,14 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
     const post = await prisma.post.findUnique({
       where: { id: params.id },
-      select: { authorId: true },
     })
 
     if (!post) {
       return NextResponse.json(
         { error: 'Post not found' },
         { status: 404 }
-      )
-    }
-
-    if (post.authorId !== session.user.id) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403 }
       )
     }
 

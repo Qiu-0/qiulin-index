@@ -30,7 +30,7 @@ export async function GET(
 
     return NextResponse.json(topic)
   } catch (error) {
-    console.error('Error fetching topic:', error)
+    console.error('Failed to fetch topic:', error)
     return NextResponse.json(
       { error: 'Failed to fetch topic' },
       { status: 500 }

@@ -1,206 +1,232 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Button, Table, Space, Modal, message, Tag } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
-import type { Topic, Category } from '@prisma/client'
-import { useRouter } from 'next/navigation'
+import { useState } from 'react'
+import { Button, Table, Modal, Form, Input, Select, message } from 'antd'
+import { PlusOutlined } from '@ant-design/icons'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { createTopic, updateTopic, deleteTopic, type TopicFormData } from './actions'
+import { Topic, Category } from '@prisma/client'
+import Link from 'next/link'
 
-interface TopicWithRelations extends Topic {
+type TopicWithCategories = Topic & {
   categories: Category[]
 }
 
-interface TopicListResponse {
-  data: TopicWithRelations[]
-  total: number
-  page: number
-  pageSize: number
-}
-
 export default function TopicsPage() {
-  const router = useRouter()
-  const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([])
-  const [loading, setLoading] = useState(false)
-  const [data, setData] = useState<TopicWithRelations[]>([])
-  const [pagination, setPagination] = useState({
-    current: 1,
-    pageSize: 10,
-    total: 0,
+  const [form] = Form.useForm<TopicFormData>()
+  const [modalVisible, setModalVisible] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const queryClient = useQueryClient()
+
+  const { data: topics, isLoading: isLoadingTopics } = useQuery<TopicWithCategories[]>({
+    queryKey: ['topics'],
+    queryFn: async () => {
+      const res = await fetch('/api/topics')
+      if (!res.ok) {
+        throw new Error('Failed to fetch topics')
+      }
+      const data = await res.json()
+      return Array.isArray(data) ? data : data.data || []
+    }
   })
 
-  const fetchData = async (page = 1, pageSize = 10) => {
-    try {
-      setLoading(true)
-      const response = await fetch(
-        `/api/topics?page=${page}&pageSize=${pageSize}`
-      )
-      const result: TopicListResponse = await response.json()
-      setData(result.data)
-      setPagination({
-        current: result.page,
-        pageSize: result.pageSize,
-        total: result.total,
-      })
-    } catch (error) {
-      message.error('获取数据失败')
-      console.error(error)
-    } finally {
-      setLoading(false)
+  const { data: categories, isLoading: isLoadingCategories, error: categoriesError } = useQuery<Category[]>({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const res = await fetch('/api/categories')
+      if (!res.ok) {
+        throw new Error('Failed to fetch categories')
+      }
+      const data = await res.json()
+      return Array.isArray(data) ? data : data.data || []
     }
-  }
+  })
 
-  useEffect(() => {
-    fetchData()
-  }, [])
-
-  const handleDelete = async (id: string) => {
-    Modal.confirm({
-      title: '确认删除',
-      content: '确定要删除这个主题吗？',
-      okText: '确定',
-      cancelText: '取消',
-      onOk: async () => {
-        try {
-          const response = await fetch(`/api/topics/${id}`, {
-            method: 'DELETE',
-          })
-          if (response.ok) {
-            message.success('删除成功')
-            fetchData(pagination.current, pagination.pageSize)
-          } else {
-            throw new Error('删除失败')
-          }
-        } catch (error) {
-          message.error('删除失败')
-          console.error(error)
-        }
-      },
-    })
-  }
-
-  const handleBatchDelete = () => {
-    if (selectedRowKeys.length === 0) {
-      message.warning('请选择要删除的主题')
-      return
+  const createMutation = useMutation({
+    mutationFn: createTopic,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['topics'] })
+      message.success('主题创建成功')
+      setModalVisible(false)
+      form.resetFields()
+    },
+    onError: (error) => {
+      message.error('创建主题失败：' + (error instanceof Error ? error.message : '未知错误'))
     }
+  })
 
-    Modal.confirm({
-      title: '确认删除',
-      content: `确定要删除选中的 ${selectedRowKeys.length} 个主题吗？`,
-      okText: '确定',
-      cancelText: '取消',
-      onOk: async () => {
-        try {
-          const response = await fetch('/api/topics/batch', {
-            method: 'DELETE',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ ids: selectedRowKeys }),
-          })
-          if (response.ok) {
-            message.success('删除成功')
-            setSelectedRowKeys([])
-            fetchData(pagination.current, pagination.pageSize)
-          } else {
-            throw new Error('删除失败')
-          }
-        } catch (error) {
-          message.error('删除失败')
-          console.error(error)
-        }
-      },
-    })
-  }
+  const updateMutation = useMutation({
+    mutationFn: updateTopic,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['topics'] })
+      message.success('主题更新成功')
+      setModalVisible(false)
+      form.resetFields()
+      setEditingId(null)
+    },
+    onError: (error) => {
+      message.error('更新主题失败：' + (error instanceof Error ? error.message : '未知错误'))
+    }
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteTopic,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['topics'] })
+      message.success('主题删除成功')
+    },
+    onError: (error) => {
+      message.error('删除主题失败：' + (error instanceof Error ? error.message : '未知错误'))
+    }
+  })
 
   const columns = [
     {
       title: '标题',
       dataIndex: 'title',
       key: 'title',
-      width: '25%',
+      render: (text: string, record: TopicWithCategories) => (
+        <Link href={`/dashboard/topics/${record.id}`}>{text}</Link>
+      ),
     },
     {
       title: '描述',
       dataIndex: 'description',
       key: 'description',
-      width: '35%',
     },
     {
       title: '分类',
       key: 'categories',
-      width: '25%',
-      render: (_: any, record: TopicWithRelations) => (
-        <Space size={[0, 8]} wrap>
-          {record.categories.map((category) => (
-            <Tag key={category.id} color="blue">
-              {category.name}
-            </Tag>
-          ))}
-        </Space>
+      render: (_: unknown, record: TopicWithCategories) => (
+        <span>
+          {record.categories?.map(cat => cat.name).join(', ') || '无分类'}
+        </span>
       ),
     },
     {
       title: '操作',
       key: 'action',
-      width: '15%',
-      render: (_: any, record: Topic) => (
-        <Space size="middle">
-          <Button
-            type="text"
-            icon={<EditOutlined />}
-            onClick={() => router.push(`/dashboard/topics/${record.id}/edit`)}
+      render: (_: unknown, record: TopicWithCategories) => (
+        <span>
+          <Button 
+            type="link" 
+            onClick={() => {
+              setEditingId(record.id)
+              form.setFieldsValue({
+                title: record.title,
+                description: record.description,
+                categoryIds: record.categories?.map(c => c.id) || []
+              })
+              setModalVisible(true)
+            }}
           >
             编辑
           </Button>
-          <Button
-            type="text"
+          <Button 
+            type="link" 
             danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record.id)}
+            onClick={() => {
+              Modal.confirm({
+                title: '确认删除',
+                content: '确定要删除这个主题吗？',
+                onOk: () => deleteMutation.mutate(record.id)
+              })
+            }}
           >
             删除
           </Button>
-        </Space>
+        </span>
       ),
     },
   ]
 
+  const handleSubmit = async (values: TopicFormData) => {
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, ...values })
+    } else {
+      createMutation.mutate(values)
+    }
+  }
+
+  if (categoriesError) {
+    return <div>加载分类失败：{(categoriesError as Error).message}</div>
+  }
+
+  const categoryOptions = categories?.map(cat => ({
+    label: cat.name,
+    value: cat.id
+  })) || []
+
   return (
     <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
-        <Space>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => router.push('/dashboard/topics/new')}
-          >
-            新建主题
-          </Button>
-          {selectedRowKeys.length > 0 && (
-            <Button danger onClick={handleBatchDelete}>
-              批量删除
-            </Button>
-          )}
-        </Space>
-        <span style={{ color: '#999' }}>
-          {selectedRowKeys.length > 0 ? `已选择 ${selectedRowKeys.length} 项` : ''}
-        </span>
+      <div style={{ marginBottom: 16 }}>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => {
+            setEditingId(null)
+            form.resetFields()
+            setModalVisible(true)
+          }}
+        >
+          新增主题
+        </Button>
       </div>
+
       <Table
-        rowKey="id"
-        rowSelection={{
-          selectedRowKeys,
-          onChange: (keys) => setSelectedRowKeys(keys as string[]),
-        }}
         columns={columns}
-        dataSource={data}
-        pagination={pagination}
-        loading={loading}
-        onChange={(pagination) => {
-          fetchData(pagination.current, pagination.pageSize)
-        }}
+        dataSource={topics || []}
+        loading={isLoadingTopics}
+        rowKey="id"
       />
+
+      <Modal
+        title={editingId ? '编辑主题' : '新增主题'}
+        open={modalVisible}
+        onCancel={() => {
+          setModalVisible(false)
+          form.resetFields()
+          setEditingId(null)
+        }}
+        footer={null}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSubmit}
+        >
+          <Form.Item
+            name="title"
+            label="标题"
+            rules={[{ required: true, message: '请输入主题标题' }]}
+          >
+            <Input />
+          </Form.Item>
+          <Form.Item
+            name="description"
+            label="描述"
+          >
+            <Input.TextArea />
+          </Form.Item>
+          <Form.Item
+            name="categoryIds"
+            label="分类"
+            rules={[{ required: true, message: '请选择至少一个分类' }]}
+          >
+            <Select
+              mode="multiple"
+              placeholder="请选择分类"
+              loading={isLoadingCategories}
+              options={categoryOptions}
+            />
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" htmlType="submit">
+              提交
+            </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   )
 } 

@@ -7,11 +7,9 @@ import type { Post, Topic, Category } from '@prisma/client'
 import { useRouter } from 'next/navigation'
 
 interface PostWithRelations extends Post {
-  topics: (Topic & { categories: Category[] })[]
-  author: {
-    id: string
-    name: string | null
-  }
+  postTrees: {
+    topic?: Topic & { categories: Category[] }
+  }[]
 }
 
 interface PostListResponse {
@@ -143,38 +141,34 @@ export default function PostsPage() {
       title: '标题',
       dataIndex: 'title',
       key: 'title',
-      width: '20%',
+      width: '25%',
     },
     {
       title: '主题',
       key: 'topics',
-      width: '20%',
+      width: '25%',
       render: (_: any, record: PostWithRelations) => (
         <Space size={[0, 8]} wrap>
-          {record.topics.map((topic) => (
-            <Tag key={topic.id}>
-              {topic.title}
-              {topic.categories.length > 0 && (
-                <span style={{ marginLeft: 4, opacity: 0.6 }}>
-                  ({topic.categories.map(c => c.name).join(', ')})
-                </span>
-              )}
-            </Tag>
-          ))}
+          {record.postTrees
+            .filter(({ topic }) => topic)
+            .map(({ topic }) => (
+              <Tag key={topic!.id}>
+                {topic!.title}
+                {topic!.categories.length > 0 && (
+                  <span style={{ marginLeft: 4, opacity: 0.6 }}>
+                    ({topic!.categories.map(c => c.name).join(', ')})
+                  </span>
+                )}
+              </Tag>
+            ))}
         </Space>
       ),
-    },
-    {
-      title: '作者',
-      key: 'author',
-      width: '10%',
-      render: (_: any, record: PostWithRelations) => record.author.name,
     },
     {
       title: '状态',
       dataIndex: 'published',
       key: 'published',
-      width: '10%',
+      width: '15%',
       render: (published: boolean) => (
         <Tag color={published ? 'green' : 'orange'}>
           {published ? '已发布' : '草稿'}
@@ -185,43 +179,31 @@ export default function PostsPage() {
       title: '创建时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      width: '15%',
+      width: '20%',
       render: (text: string) => new Date(text).toLocaleString(),
     },
     {
       title: '操作',
       key: 'action',
-      width: '25%',
+      width: '15%',
       render: (_: any, record: PostWithRelations) => (
         <Space size="middle">
           <Button
             type="text"
+            icon={<EyeOutlined />}
+            onClick={() => router.push(`/posts/${record.id}`)}
+          />
+          <Button
+            type="text"
             icon={<EditOutlined />}
             onClick={() => router.push(`/dashboard/posts/${record.id}/edit`)}
-          >
-            编辑
-          </Button>
-          <Button
-            type="text"
-            icon={<EyeOutlined />}
-            onClick={() => window.open(`/posts/${record.id}`, '_blank')}
-          >
-            预览
-          </Button>
-          <Button
-            type="text"
-            onClick={() => handlePublish(record.id, !record.published)}
-          >
-            {record.published ? '取消发布' : '发布'}
-          </Button>
+          />
           <Button
             type="text"
             danger
             icon={<DeleteOutlined />}
             onClick={() => handleDelete(record.id)}
-          >
-            删除
-          </Button>
+          />
         </Space>
       ),
     },

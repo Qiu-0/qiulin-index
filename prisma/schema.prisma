@@ -8,16 +8,6 @@ datasource db {
   relationMode = "prisma"
 }
 
-model User {
-  id        String   @id
-  name      String
-  email     String   @unique
-  password  String
-  posts     Post[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
 model Category {
   id          String   @id
   name        String
@@ -43,13 +33,9 @@ model Post {
   content     String         @db.Text
   description String?        @db.Text
   published   Boolean        @default(false)
-  authorId    String
-  author      User           @relation(fields: [authorId], references: [id])
   postTrees   TopicPostTree[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
-
-  @@index([authorId])
 }
 
 model TopicPostTree {
@@ -58,8 +44,8 @@ model TopicPostTree {
   postId      String
   parentId    String?
   order       Int      @default(0)
-  topic       Topic    @relation(fields: [topicId], references: [id])
-  post        Post     @relation(fields: [postId], references: [id])
+  topic       Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
   parent      TopicPostTree?  @relation("TreeToTree", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   children    TopicPostTree[] @relation("TreeToTree")
   createdAt   DateTime @default(now())

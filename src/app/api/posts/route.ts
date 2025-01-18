@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import prisma from '@/lib/prisma'
 import { generateId } from '@/lib/utils/ulid'
 import { z } from 'zod'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 
 const postSchema = z.object({
   title: z.string().min(1, '标题不能为空'),
@@ -13,8 +11,32 @@ const postSchema = z.object({
   topicIds: z.array(z.string()).optional(),
 })
 
+async function cleanupOrphanedPostTrees() {
+  try {
+    // 找出所有有效的主题 ID
+    const topics = await prisma.topic.findMany({
+      select: { id: true }
+    })
+    const validTopicIds = topics.map(t => t.id)
+
+    // 删除所有引用不存在主题的 TopicPostTree 记录
+    await prisma.topicPostTree.deleteMany({
+      where: {
+        topicId: {
+          notIn: validTopicIds
+        }
+      }
+    })
+  } catch (error) {
+    console.error('Failed to cleanup orphaned post trees:', error)
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
+    // 先清理无效数据
+    await cleanupOrphanedPostTrees()
+
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
     const pageSize = parseInt(searchParams.get('pageSize') || '10')
@@ -27,26 +49,24 @@ export async function GET(request: NextRequest) {
         take: pageSize,
         orderBy: { createdAt: 'desc' },
         include: {
-          topics: {
+          postTrees: {
             include: {
-              categories: {
-                select: {
-                  id: true,
-                  name: true,
+              topic: {
+                include: {
+                  categories: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
                 },
               },
-            },
-          },
-          author: {
-            select: {
-              id: true,
-              name: true,
             },
           },
         },
       }),
     ])
-
+    
     return NextResponse.json({
       data: posts,
       total,
@@ -64,42 +84,36 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
     const body = await request.json()
     const validatedData = postSchema.parse(body)
     const { topicIds, ...postData } = validatedData
 
+    const postId = generateId()
     const post = await prisma.post.create({
       data: {
-        id: generateId(),
+        id: postId,
         ...postData,
-        authorId: session.user.id,
-        topics: topicIds ? {
-          connect: topicIds.map(id => ({ id })),
+        postTrees: topicIds ? {
+          create: topicIds.map((topicId) => ({
+            id: generateId(),
+            topicId,
+            order: 0,
+          })),
         } : undefined,
       },
       include: {
-        topics: {
+        postTrees: {
           include: {
-            categories: {
-              select: {
-                id: true,
-                name: true,
+            topic: {
+              include: {
+                categories: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
               },
             },
-          },
-        },
-        author: {
-          select: {
-            id: true,
-            name: true,
           },
         },
       },

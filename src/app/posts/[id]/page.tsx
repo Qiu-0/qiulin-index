@@ -9,14 +9,10 @@ import type { Post, Topic, Category } from '@prisma/client'
 
 const { Title } = Typography
 
-type PostWithoutAuthorId = Omit<Post, 'authorId'>
-
-interface PostWithRelations extends PostWithoutAuthorId {
-  topics: (Topic & { categories: Category[] })[]
-  author: {
-    id: string
-    name: string | null
-  }
+interface PostWithRelations extends Post {
+  postTrees: {
+    topic: Topic & { categories: Category[] }
+  }[]
 }
 
 const plugins = [
@@ -73,7 +69,7 @@ export default function PostPage({ params }: { params: { id: string } }) {
             )}
             <div className="flex items-center justify-between mt-4">
               <Space size={[0, 8]} wrap>
-                {post.topics.map((topic) => (
+                {post.postTrees.map(({ topic }) => (
                   <Tag key={topic.id}>
                     {topic.title}
                     {topic.categories.length > 0 && (
@@ -85,7 +81,6 @@ export default function PostPage({ params }: { params: { id: string } }) {
                 ))}
               </Space>
               <Space className="text-gray-500">
-                <span>作者：{post.author.name}</span>
                 <span>发布于：{new Date(post.createdAt).toLocaleString()}</span>
               </Space>
             </div>

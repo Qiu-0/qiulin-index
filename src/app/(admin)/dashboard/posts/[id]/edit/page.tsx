@@ -18,7 +18,9 @@ interface PostForm {
 }
 
 interface PostWithRelations extends Post {
-  topics: (Topic & { categories: Category[] })[]
+  postTrees: {
+    topic: Topic & { categories: Category[] }
+  }[]
 }
 
 const plugins = [
@@ -40,10 +42,13 @@ export default function PostEditPage({ params }: { params: { id: string } }) {
       try {
         const response = await fetch('/api/topics?pageSize=100')
         const result = await response.json()
-        setTopics(result.data)
+        console.log('获取到的主题数据：', result)
+        const topicsData = Array.isArray(result) ? result : (result.data || [])
+        console.log('处理后的主题数据：', topicsData)
+        setTopics(topicsData)
       } catch (error) {
         message.error('获取主题列表失败')
-        console.error(error)
+        console.error('获取主题列表错误：', error)
       }
     }
 
@@ -61,13 +66,20 @@ export default function PostEditPage({ params }: { params: { id: string } }) {
           throw new Error('获取文章详情失败')
         }
         const post: PostWithRelations = await response.json()
+        console.log('文章详情：', post)
+        // 从 postTrees 中提取主题 ID
+        const topicIds = post.postTrees?.map(pt => pt.topic.id) || []
+        console.log('主题 IDs：', topicIds)
+
         form.setFieldsValue({
           title: post.title,
           description: post.description || undefined,
           published: post.published,
-          topicIds: post.topics.map(t => t.id),
+          topicIds,
         })
-        setContent(post.content)
+        if (post.content) {
+          setContent(post.content)
+        }
       } catch (error) {
         message.error('获取文章详情失败')
         console.error(error)
@@ -141,15 +153,16 @@ export default function PostEditPage({ params }: { params: { id: string } }) {
         <Form.Item
           name="topicIds"
           label="所属主题"
+          rules={[{ required: true, message: '请选择至少一个主题' }]}
         >
           <Select
             mode="multiple"
             allowClear
             placeholder="请选择主题"
-            options={topics.map(topic => ({
+            options={topics?.map(topic => ({
               label: topic.title,
               value: topic.id,
-            }))}
+            })) || []}
           />
         </Form.Item>
 
@@ -157,11 +170,14 @@ export default function PostEditPage({ params }: { params: { id: string } }) {
           label="内容"
           required
           help="支持 Markdown 格式"
+          rules={[{ required: true, message: '请输入内容' }]}
         >
           <Editor
             value={content}
             plugins={plugins}
-            onChange={setContent}
+            onChange={(v) => {
+              setContent(v)
+            }}
             uploadImages={async (files) => {
               // TODO: 实现图片上传功能
               return []
