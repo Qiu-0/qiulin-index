@@ -5,10 +5,23 @@ import { Button, Table, Space, Modal, message, Tag } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons'
 import type { Post, Topic, Category } from '@prisma/client'
 import { useRouter } from 'next/navigation'
+import { getPosts, deletePost, deletePosts, updatePostStatus } from './actions'
 
 interface PostWithRelations extends Post {
   postTrees: {
-    topic?: Topic & { categories: Category[] }
+    id: string
+    topicId: string
+    topic: {
+      id: string
+      title: string
+      description: string | null
+      createdAt: Date
+      updatedAt: Date
+      categories: {
+        id: string
+        name: string
+      }[]
+    }
   }[]
 }
 
@@ -33,10 +46,7 @@ export default function PostsPage() {
   const fetchData = async (page = 1, pageSize = 10) => {
     try {
       setLoading(true)
-      const response = await fetch(
-        `/api/posts?page=${page}&pageSize=${pageSize}`
-      )
-      const result: PostListResponse = await response.json()
+      const result = await getPosts(page, pageSize)
       setData(result.data)
       setPagination({
         current: result.page,
@@ -63,14 +73,12 @@ export default function PostsPage() {
       cancelText: '取消',
       onOk: async () => {
         try {
-          const response = await fetch(`/api/posts/${id}`, {
-            method: 'DELETE',
-          })
-          if (response.ok) {
+          const result = await deletePost(id)
+          if (result.success) {
             message.success('删除成功')
             fetchData(pagination.current, pagination.pageSize)
           } else {
-            throw new Error('删除失败')
+            throw new Error(result.error)
           }
         } catch (error) {
           message.error('删除失败')
@@ -93,19 +101,13 @@ export default function PostsPage() {
       cancelText: '取消',
       onOk: async () => {
         try {
-          const response = await fetch('/api/posts/batch', {
-            method: 'DELETE',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ ids: selectedRowKeys }),
-          })
-          if (response.ok) {
+          const result = await deletePosts(selectedRowKeys)
+          if (result.success) {
             message.success('删除成功')
             setSelectedRowKeys([])
             fetchData(pagination.current, pagination.pageSize)
           } else {
-            throw new Error('删除失败')
+            throw new Error(result.error)
           }
         } catch (error) {
           message.error('删除失败')
@@ -117,18 +119,12 @@ export default function PostsPage() {
 
   const handlePublish = async (id: string, published: boolean) => {
     try {
-      const response = await fetch(`/api/posts/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ published }),
-      })
-      if (response.ok) {
+      const result = await updatePostStatus(id, published)
+      if (result.success) {
         message.success(published ? '发布成功' : '取消发布成功')
         fetchData(pagination.current, pagination.pageSize)
       } else {
-        throw new Error(published ? '发布失败' : '取消发布失败')
+        throw new Error(result.error)
       }
     } catch (error) {
       message.error(published ? '发布失败' : '取消发布失败')
@@ -152,11 +148,11 @@ export default function PostsPage() {
           {record.postTrees
             .filter(({ topic }) => topic)
             .map(({ topic }) => (
-              <Tag key={topic!.id}>
-                {topic!.title}
-                {topic!.categories.length > 0 && (
+              <Tag key={topic.id}>
+                {topic.title}
+                {topic.categories.length > 0 && (
                   <span style={{ marginLeft: 4, opacity: 0.6 }}>
-                    ({topic!.categories.map(c => c.name).join(', ')})
+                    ({topic.categories.map(c => c.name).join(', ')})
                   </span>
                 )}
               </Tag>

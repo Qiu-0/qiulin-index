@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import prisma from "@/lib/prisma"
 import { z } from 'zod'
 
 const topicSchema = z.object({
@@ -16,8 +16,16 @@ export async function GET(
   try {
     const topic = await prisma.topic.findUnique({
       where: { id: params.id },
-      include: {
-        categories: true
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        categories: {
+          select: {
+            id: true,
+            name: true,
+          }
+        }
       }
     })
 
@@ -28,7 +36,58 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(topic)
+    // 获取主题下的文章树结构
+    const postTrees = await prisma.topicPostTree.findMany({
+      where: {
+        topicId: params.id,
+        parentId: null // 只获取顶层节点
+      },
+      select: {
+        id: true,
+        order: true,
+        post: {
+          select: {
+            id: true,
+            title: true,
+          }
+        },
+        children: {
+          select: {
+            id: true,
+            order: true,
+            post: {
+              select: {
+                id: true,
+                title: true,
+              }
+            },
+            children: {
+              select: {
+                id: true,
+                order: true,
+                post: {
+                  select: {
+                    id: true,
+                    title: true,
+                  }
+                }
+              },
+              orderBy: {
+                order: "asc"
+              }
+            }
+          },
+          orderBy: {
+            order: "asc"
+          }
+        }
+      },
+      orderBy: {
+        order: "asc"
+      }
+    })
+
+    return NextResponse.json({ topic, postTrees })
   } catch (error) {
     console.error('Failed to fetch topic:', error)
     return NextResponse.json(
