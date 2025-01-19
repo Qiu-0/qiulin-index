@@ -1,22 +1,10 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { headers } from "next/headers"
+import { getTopics } from "../actions"
 
 export const metadata: Metadata = {
   title: "主题列表",
   description: "浏览所有主题分类",
-}
-
-async function getTopics() {
-  const headersList = headers()
-  const host = headersList.get("host")
-  const protocol = process?.env?.NODE_ENV === "development" ? "http" : "https"
-  
-  const res = await fetch(`${protocol}://${host}/api/topics`, {
-    next: { revalidate: 3600 }
-  })
-  if (!res.ok) throw new Error("Failed to fetch topics")
-  return res.json()
 }
 
 export default async function TopicsPage() {

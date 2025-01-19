@@ -5,24 +5,10 @@ import { format } from "date-fns"
 import { zhCN } from "date-fns/locale"
 import { MDXRemote } from "next-mdx-remote/rsc"
 import { headers } from "next/headers"
+import { getPost } from "../../actions"
 
 interface Props {
   params: { id: string }
-}
-
-async function getPost(id: string) {
-  const headersList = headers()
-  const host = headersList.get("host")
-  const protocol = process?.env?.NODE_ENV === "development" ? "http" : "https"
-  
-  const res = await fetch(`${protocol}://${host}/api/posts/${id}`, {
-    next: { revalidate: 3600 }
-  })
-  if (!res.ok) {
-    if (res.status === 404) return null
-    throw new Error("Failed to fetch post")
-  }
-  return res.json()
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -55,7 +41,7 @@ export default async function PostPage({ params }: Props) {
               </Link>
             )}
             <time
-              dateTime={post.createdAt}
+              dateTime={new Date(post.createdAt).toISOString()}
               className="text-sm text-muted-foreground"
             >
               {format(new Date(post.createdAt), "PPP", { locale: zhCN })}

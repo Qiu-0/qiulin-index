@@ -2,25 +2,10 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ChevronRight } from "lucide-react"
-import { headers } from "next/headers"
+import { getTopic } from "../../actions"
 
 interface Props {
   params: { id: string }
-}
-
-async function getTopic(id: string) {
-  const headersList = headers()
-  const host = headersList.get("host")
-  const protocol = process?.env?.NODE_ENV === "development" ? "http" : "https"
-  
-  const res = await fetch(`${protocol}://${host}/api/topics/${id}`, {
-    next: { revalidate: 3600 }
-  })
-  if (!res.ok) {
-    if (res.status === 404) return null
-    throw new Error("Failed to fetch topic")
-  }
-  return res.json()
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

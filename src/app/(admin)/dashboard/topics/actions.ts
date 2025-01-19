@@ -3,6 +3,7 @@
 import { z } from 'zod'
 import { ulid } from 'ulid'
 import prisma from '@/lib/prisma'
+import type { Topic, Category } from '@prisma/client'
 
 const topicSchema = z.object({
   title: z.string().min(1, '标题不能为空'),
@@ -12,7 +13,37 @@ const topicSchema = z.object({
 
 export type TopicFormData = z.infer<typeof topicSchema>
 
-export async function createTopic(data: TopicFormData) {
+export interface TopicWithCategories extends Topic {
+  categories: Category[]
+  _count: {
+    postTrees: number
+  }
+}
+
+export async function getTopics(): Promise<TopicWithCategories[]> {
+  try {
+    const topics = await prisma.topic.findMany({
+      include: {
+        categories: true,
+        _count: {
+          select: {
+            postTrees: true
+          }
+        }
+      },
+      orderBy: {
+        title: 'asc'
+      }
+    })
+
+    return topics
+  } catch (error) {
+    console.error('Error fetching topics:', error)
+    throw new Error('Failed to fetch topics')
+  }
+}
+
+export async function createTopic(data: TopicFormData): Promise<TopicWithCategories> {
   const validated = topicSchema.parse(data)
   return prisma.topic.create({
     data: {
@@ -25,11 +56,16 @@ export async function createTopic(data: TopicFormData) {
     },
     include: {
       categories: true,
+      _count: {
+        select: {
+          postTrees: true
+        }
+      }
     },
   })
 }
 
-export async function updateTopic(data: TopicFormData & { id: string }) {
+export async function updateTopic(data: TopicFormData & { id: string }): Promise<TopicWithCategories> {
   const { id, ...rest } = data
   const validated = topicSchema.parse(rest)
   return prisma.topic.update({
@@ -43,6 +79,11 @@ export async function updateTopic(data: TopicFormData & { id: string }) {
     },
     include: {
       categories: true,
+      _count: {
+        select: {
+          postTrees: true
+        }
+      }
     },
   })
 }

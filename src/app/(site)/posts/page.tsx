@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { format } from "date-fns"
 import { zhCN } from "date-fns/locale"
-import { headers } from "next/headers"
+import { getPosts } from "../actions"
 
 export const metadata: Metadata = {
   title: "博客列表",
@@ -11,19 +11,6 @@ export const metadata: Metadata = {
 
 interface Props {
   searchParams: { page?: string }
-}
-
-async function getPosts(page: number = 1) {
-  const headersList = headers()
-  const host = headersList.get("host")
-  const protocol = process?.env?.NODE_ENV === "development" ? "http" : "https"
-  
-  const res = await fetch(
-    `${protocol}://${host}/api/posts?page=${page}`,
-    { next: { revalidate: 3600 } }
-  )
-  if (!res.ok) throw new Error("Failed to fetch posts")
-  return res.json()
 }
 
 export default async function PostsPage({ searchParams }: Props) {

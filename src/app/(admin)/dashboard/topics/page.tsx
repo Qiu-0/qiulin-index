@@ -1,16 +1,13 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Button, Table, Modal, Form, Input, Select, message } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { createTopic, updateTopic, deleteTopic, type TopicFormData } from './actions'
-import { Topic, Category } from '@prisma/client'
-import Link from 'next/link'
-
-type TopicWithCategories = Topic & {
-  categories: Category[]
-}
+import { createTopic, updateTopic, deleteTopic, getTopics, type TopicFormData, type TopicWithCategories } from './actions'
+import { getCategories } from '../categories/actions'
+import type { Category } from '@prisma/client'
 
 export default function TopicsPage() {
   const [form] = Form.useForm<TopicFormData>()
@@ -21,25 +18,16 @@ export default function TopicsPage() {
   const { data: topics, isLoading: isLoadingTopics } = useQuery<TopicWithCategories[]>({
     queryKey: ['topics'],
     queryFn: async () => {
-      const res = await fetch('/api/topics')
-      if (!res.ok) {
-        throw new Error('Failed to fetch topics')
-      }
-      const data = await res.json()
-      return Array.isArray(data) ? data : data.data || []
+      console.log('Calling getTopics...')
+      const result = await getTopics()
+      console.log('getTopics result:', result)
+      return result
     }
   })
 
-  const { data: categories, isLoading: isLoadingCategories, error: categoriesError } = useQuery<Category[]>({
+  const { data: categoriesData, isLoading: isLoadingCategories } = useQuery({
     queryKey: ['categories'],
-    queryFn: async () => {
-      const res = await fetch('/api/categories')
-      if (!res.ok) {
-        throw new Error('Failed to fetch categories')
-      }
-      const data = await res.json()
-      return Array.isArray(data) ? data : data.data || []
-    }
+    queryFn: () => getCategories(100)
   })
 
   const createMutation = useMutation({
@@ -104,6 +92,13 @@ export default function TopicsPage() {
       ),
     },
     {
+      title: '文章数',
+      key: 'postCount',
+      render: (_: unknown, record: TopicWithCategories) => (
+        <span>{record._count.postTrees}</span>
+      ),
+    },
+    {
       title: '操作',
       key: 'action',
       render: (_: unknown, record: TopicWithCategories) => (
@@ -114,7 +109,7 @@ export default function TopicsPage() {
               setEditingId(record.id)
               form.setFieldsValue({
                 title: record.title,
-                description: record.description,
+                description: record.description || undefined,
                 categoryIds: record.categories?.map(c => c.id) || []
               })
               setModalVisible(true)
@@ -148,11 +143,7 @@ export default function TopicsPage() {
     }
   }
 
-  if (categoriesError) {
-    return <div>加载分类失败：{(categoriesError as Error).message}</div>
-  }
-
-  const categoryOptions = categories?.map(cat => ({
+  const categoryOptions = categoriesData?.data.map(cat => ({
     label: cat.name,
     value: cat.id
   })) || []

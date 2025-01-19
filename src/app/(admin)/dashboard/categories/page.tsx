@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button, Table, Modal, Form, Input, message } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { createCategory, updateCategory, deleteCategory, type CategoryFormData } from './actions'
+import { createCategory, updateCategory, deleteCategory, getCategories, type CategoryFormData } from './actions'
 import { Category } from '@prisma/client'
 
 export default function CategoriesPage() {
@@ -13,17 +13,9 @@ export default function CategoriesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const queryClient = useQueryClient()
 
-  const { data: categories, isLoading } = useQuery<Category[]>({
+  const { data: categoriesData, isLoading } = useQuery({
     queryKey: ['categories'],
-    queryFn: async () => {
-      const res = await fetch('/api/categories')
-      if (!res.ok) {
-        throw new Error('Failed to fetch categories')
-      }
-      const data = await res.json()
-      // 确保返回的是数组
-      return Array.isArray(data) ? data : data.data || []
-    }
+    queryFn: () => getCategories(100)
   })
 
   const createMutation = useMutation({
@@ -84,7 +76,10 @@ export default function CategoriesPage() {
             type="link" 
             onClick={() => {
               setEditingId(record.id)
-              form.setFieldsValue(record)
+              form.setFieldsValue({
+                name: record.name,
+                description: record.description || undefined
+              })
               setModalVisible(true)
             }}
           >
@@ -134,7 +129,7 @@ export default function CategoriesPage() {
 
       <Table
         columns={columns}
-        dataSource={categories || []} // 确保传入数组
+        dataSource={categoriesData?.data || []}
         loading={isLoading}
         rowKey="id"
       />

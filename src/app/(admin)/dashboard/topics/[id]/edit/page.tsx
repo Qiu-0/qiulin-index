@@ -4,11 +4,13 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Form, Input, Button, Card, Space, Select, message, Spin } from 'antd'
 import type { Topic, Category } from '@prisma/client'
+import { getCategories } from '../../../categories/actions'
+import { getTopic, updateTopic } from '../actions'
 
 interface TopicForm {
   title: string
   description?: string
-  categoryIds?: string[]
+  categoryIds: string[]
 }
 
 interface TopicWithCategories extends Topic {
@@ -27,9 +29,8 @@ export default function TopicEditPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     const fetchOptions = async () => {
       try {
-        const categoriesResponse = await fetch('/api/categories?pageSize=100')
-        const categoriesResult = await categoriesResponse.json()
-        setCategories(categoriesResult.data)
+        const result = await getCategories(100)
+        setCategories(result.data)
       } catch (error) {
         message.error('获取选项数据失败')
         console.error(error)
@@ -45,11 +46,7 @@ export default function TopicEditPage({ params }: { params: { id: string } }) {
       if (isNew) return
       try {
         setLoading(true)
-        const response = await fetch(`/api/topics/${params.id}`)
-        if (!response.ok) {
-          throw new Error('获取主题详情失败')
-        }
-        const topic: TopicWithCategories = await response.json()
+        const topic = await getTopic(params.id)
         form.setFieldsValue({
           title: topic.title,
           description: topic.description || undefined,
@@ -69,18 +66,7 @@ export default function TopicEditPage({ params }: { params: { id: string } }) {
   const onFinish = async (values: TopicForm) => {
     try {
       setSubmitting(true)
-      const response = await fetch(`/api/topics/${params.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(values),
-      })
-
-      if (!response.ok) {
-        throw new Error('更新失败')
-      }
-
+      await updateTopic({ id: params.id, ...values })
       message.success('更新成功')
       router.push('/dashboard/topics')
     } catch (error) {
@@ -125,6 +111,7 @@ export default function TopicEditPage({ params }: { params: { id: string } }) {
         <Form.Item
           name="categoryIds"
           label="所属分类"
+          rules={[{ required: true, message: '请选择至少一个分类' }]}
         >
           <Select
             mode="multiple"

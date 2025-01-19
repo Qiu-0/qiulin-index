@@ -1,19 +1,7 @@
 import Link from "next/link"
 import { format } from "date-fns"
 import { zhCN } from "date-fns/locale"
-import { headers } from "next/headers"
-
-async function getHomeData() {
-  const headersList = headers()
-  const host = headersList.get("host")
-  const protocol = process?.env?.NODE_ENV === "development" ? "http" : "https"
-  
-  const res = await fetch(`${protocol}://${host}/api/home`, {
-    next: { revalidate: 3600 } // 每小时重新验证一次
-  })
-  if (!res.ok) throw new Error("Failed to fetch home data")
-  return res.json()
-}
+import { getHomeData } from "./actions"
 
 export default async function HomePage() {
   const { latestPosts, popularTopics } = await getHomeData()

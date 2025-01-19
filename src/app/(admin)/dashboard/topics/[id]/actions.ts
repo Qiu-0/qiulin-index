@@ -18,12 +18,32 @@ export type PostWithTree = Post & {
   postTrees: TopicPostTree[]
 }
 
-export async function getTopic(id: string): Promise<Topic> {
-  const topic = await prisma.topic.findUnique({
-    where: { id }
-  })
-  if (!topic) throw new Error('主题不存在')
-  return topic
+const topicSchema = z.object({
+  title: z.string().min(1, '标题不能为空'),
+  description: z.string().optional(),
+  categoryIds: z.array(z.string()).min(1, '请选择至少一个分类'),
+})
+
+export type TopicFormData = z.infer<typeof topicSchema>
+
+export async function getTopic(id: string) {
+  try {
+    const topic = await prisma.topic.findUnique({
+      where: { id },
+      include: {
+        categories: true
+      }
+    })
+
+    if (!topic) {
+      throw new Error('Topic not found')
+    }
+
+    return topic
+  } catch (error) {
+    console.error('Error fetching topic:', error)
+    throw new Error('Failed to fetch topic')
+  }
 }
 
 export async function getTopicPosts(topicId: string): Promise<PostWithTree[]> {
@@ -120,5 +140,23 @@ export async function updateTopicPostTree(data: UpdateTopicPostTreeData) {
       parentId,
       order
     }
+  })
+}
+
+export async function updateTopic(data: TopicFormData & { id: string }) {
+  const { id, ...rest } = data
+  const validated = topicSchema.parse(rest)
+  return prisma.topic.update({
+    where: { id },
+    data: {
+      title: validated.title,
+      description: validated.description,
+      categories: {
+        set: validated.categoryIds.map(id => ({ id })),
+      },
+    },
+    include: {
+      categories: true,
+    },
   })
 } 
