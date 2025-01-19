@@ -3,11 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Form, Input, Button, Card, Space, message, Spin, Select } from 'antd'
-import { Editor } from '@bytemd/react'
-import gfm from '@bytemd/plugin-gfm'
-import 'bytemd/dist/index.css'
 import type { Post, Topic, Category } from '@prisma/client'
 import { generateId } from '@/lib/utils/ulid'
+import { MDXEditor } from '@/components/mdx-editor'
 
 interface PostForm {
   title: string
@@ -22,10 +20,6 @@ interface PostWithRelations extends Post {
     topic: Topic & { categories: Category[] }
   }[]
 }
-
-const plugins = [
-  gfm(),
-]
 
 export default function PostEditPage({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -172,23 +166,13 @@ export default function PostEditPage({ params }: { params: { id: string } }) {
           help="支持 Markdown 格式"
           rules={[{ required: true, message: '请输入内容' }]}
         >
-          <Editor
+          <MDXEditor
             value={content}
-            plugins={plugins}
-            onChange={(v) => {
-              setContent(v)
-            }}
-            uploadImages={async (files) => {
-              // TODO: 实现图片上传功能
-              return []
-            }}
+            onChange={(v) => setContent(v || '')}
           />
         </Form.Item>
 
-        <Form.Item
-          name="published"
-          valuePropName="checked"
-        >
+        <Form.Item>
           <Space>
             <Button type="primary" htmlType="submit" loading={submitting}>
               {isNew ? '创建' : '更新'}

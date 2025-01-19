@@ -1,95 +1,92 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Button, Form, Input, Select, message } from 'antd'
 import { useRouter } from 'next/navigation'
-import dynamic from 'next/dynamic'
+import { Form, Input, Button, Card, Space, Select, message } from 'antd'
 import { useForm, Controller } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import * as z from 'zod'
-import { useStore } from './store'
-import { createPost } from './actions'
 import type { Topic } from '@prisma/client'
+import { MDXEditor } from '@/components/mdx-editor'
+import { createPost } from './actions'
 
-const MDEditor = dynamic(() => import('@uiw/react-md-editor'), {
-  ssr: false,
-})
-
-const formSchema = z.object({
-  title: z.string().min(1, '标题不能为空'),
-  content: z.string().min(1, '内容不能为空'),
-  topicIds: z.array(z.string()).min(1, '请选择至少一个主题'),
-  published: z.boolean().optional(),
-})
-
-type FormValues = z.infer<typeof formSchema>
+interface PostForm {
+  title: string
+  content: string
+  topicIds: string[]
+  description?: string
+}
 
 export default function NewPostPage() {
   const router = useRouter()
-  const { topics, fetchTopics } = useStore()
-  const [form] = Form.useForm()
-  const [content, setContent] = useState('')
+  const { control, handleSubmit } = useForm<PostForm>()
+  const [submitting, setSubmitting] = useState(false)
+  const [topics, setTopics] = useState<Topic[]>([])
 
-  const { control, handleSubmit, formState: { errors } } = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      published: true,
-      content: '',
-    }
-  })
-
+  // 获取所有可选的主题
   useEffect(() => {
-    fetchTopics()
-  }, [fetchTopics])
+    const fetchTopics = async () => {
+      try {
+        const response = await fetch('/api/topics?pageSize=100')
+        const result = await response.json()
+        setTopics(result.data)
+      } catch (error) {
+        message.error('获取主题列表失败')
+        console.error(error)
+      }
+    }
 
-  const onSubmit = async (values: FormValues) => {
+    fetchTopics()
+  }, [])
+
+  const onSubmit = async (data: PostForm) => {
     try {
-      await createPost(values)
+      setSubmitting(true)
+      await createPost(data)
       message.success('创建成功')
       router.push('/dashboard/posts')
     } catch (error) {
       message.error('创建失败')
       console.error(error)
+    } finally {
+      setSubmitting(false)
     }
   }
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">新建文章</h1>
-      </div>
+    <Card title="新建文章">
+      <Form layout="vertical" onSubmitCapture={handleSubmit(onSubmit)} style={{ maxWidth: 800 }}>
+        <Controller
+          name="title"
+          control={control}
+          rules={{ required: '请输入标题' }}
+          render={({ field, fieldState: { error } }) => (
+            <Form.Item 
+              label="标题" 
+              validateStatus={error ? 'error' : undefined}
+              help={error?.message}
+            >
+              <Input {...field} placeholder="请输入标题" />
+            </Form.Item>
+          )}
+        />
 
-      <Form
-        form={form}
-        layout="vertical"
-        onFinish={handleSubmit(onSubmit)}
-        className="max-w-4xl"
-      >
-        <Form.Item
-          label="标题"
-          validateStatus={errors.title ? 'error' : ''}
-          help={errors.title?.message}
-        >
-          <Controller
-            name="title"
-            control={control}
-            render={({ field }) => (
-              <Input {...field} placeholder="请输入文章标题" />
-            )}
-          />
-        </Form.Item>
+        <Controller
+          name="description"
+          control={control}
+          render={({ field }) => (
+            <Form.Item label="描述">
+              <Input.TextArea {...field} rows={4} placeholder="请输入描述" />
+            </Form.Item>
+          )}
+        />
 
-        <Form.Item
-          label="主题"
-          validateStatus={errors.topicIds ? 'error' : ''}
-          help={errors.topicIds?.message}
-        >
-          <Controller
-            name="topicIds"
-            control={control}
-            render={({ field }) => (
+        <Controller
+          name="topicIds"
+          control={control}
+          render={({ field }) => (
+            <Form.Item label="所属主题">
               <Select
                 mode="multiple"
+                allowClear
                 placeholder="请选择主题"
                 {...field}
                 options={topics.map((topic: Topic) => ({
@@ -97,46 +94,36 @@ export default function NewPostPage() {
                   value: topic.id,
                 }))}
               />
-            )}
-          />
-        </Form.Item>
+            </Form.Item>
+          )}
+        />
 
-        <Form.Item
-          label="内容"
-          validateStatus={errors.content ? 'error' : ''}
-          help={errors.content?.message}
-        >
-          <Controller
-            name="content"
-            control={control}
-            render={({ field }) => (
-              <MDEditor
-                value={field.value}
-                onChange={field.onChange}
-                height={500}
-                preview="edit"
-              />
-            )}
-          />
-        </Form.Item>
+        <Controller
+          name="content"
+          control={control}
+          rules={{ required: '请输入内容' }}
+          render={({ field: { value, onChange }, fieldState: { error } }) => (
+            <Form.Item 
+              label="内容" 
+              validateStatus={error ? 'error' : undefined}
+              help={error?.message}
+            >
+              <MDXEditor value={value} onChange={onChange} />
+            </Form.Item>
+          )}
+        />
 
         <Form.Item>
-          <div className="flex gap-4">
-            <Button type="primary" htmlType="submit">
-              发布
+          <Space>
+            <Button type="primary" htmlType="submit" loading={submitting}>
+              创建
             </Button>
-            <Button
-              onClick={() => {
-                form.submit()
-                form.setFieldValue('published', false)
-              }}
-            >
-              保存草稿
+            <Button onClick={() => router.push('/dashboard/posts')}>
+              取消
             </Button>
-            <Button onClick={() => router.back()}>取消</Button>
-          </div>
+          </Space>
         </Form.Item>
       </Form>
-    </div>
+    </Card>
   )
 } 
