@@ -26,4 +26,5 @@
 - 请选择适合的版本的推荐依赖：@headlessui/react @heroicons/react  zustand  @tanstack/react-query react-hook-form zod @hookform/resolvers  clsx class-variance-authority date-fns antd prisma  
 - 数据库采用prisma结合mysql， 主键采用ulid
 - 管理端通过server action 处理请求， 展示端通过api 处理请求
+- 代码基于windows上的cursor开发
 # 请慢慢思考，设计合理的流程或步骤一步一步完成整个系统。

@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma'
+import prisma from '@/lib/prisma'
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -93,8 +93,8 @@ export default async function HomePage() {
               )}
               <div className="flex flex-wrap gap-2">
                 {post.topics.map(topic => (
-                  <Link 
-                    key={topic.id} 
+                  <Link
+                    key={topic.id}
                     href={`/topics/${topic.id}`}
                     className="text-xs bg-secondary px-2 py-1 rounded-md hover:bg-secondary/80"
                   >
@@ -131,7 +131,7 @@ export default async function HomePage() {
               <div className="flex justify-between items-center">
                 <div className="flex flex-wrap gap-2">
                   {topic.categories.map(category => (
-                    <span 
+                    <span
                       key={category.id}
                       className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-md"
                     >
