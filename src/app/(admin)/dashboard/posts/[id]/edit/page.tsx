@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Form, Input, Button, Card, Space, message, Spin, Select } from 'antd'
+import { Form, Input, Button, Card, Space, message, Spin, Select, Switch } from 'antd'
 import type { Post, Topic, Category } from '@prisma/client'
-import { generateId } from '@/lib/utils/ulid'
 import { MDXEditor } from '@/components/mdx-editor'
+import { getPost, getTopics, upsertPost } from './actions'
 
 interface PostForm {
   title: string
@@ -13,6 +13,12 @@ interface PostForm {
   description?: string
   published?: boolean
   topicIds?: string[]
+}
+
+interface TopicOption {
+  id: string
+  title: string
+  description?: string | null
 }
 
 interface PostWithRelations extends Post {
@@ -26,7 +32,7 @@ export default function PostEditPage({ params }: { params: { id: string } }) {
   const [form] = Form.useForm<PostForm>()
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [topics, setTopics] = useState<Topic[]>([])
+  const [topics, setTopics] = useState<TopicOption[]>([])
   const [content, setContent] = useState('')
   const isNew = params.id === 'new'
 
@@ -34,11 +40,7 @@ export default function PostEditPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     const fetchTopics = async () => {
       try {
-        const response = await fetch('/api/topics?pageSize=100')
-        const result = await response.json()
-        console.log('获取到的主题数据：', result)
-        const topicsData = Array.isArray(result) ? result : (result.data || [])
-        console.log('处理后的主题数据：', topicsData)
+        const topicsData = await getTopics()
         setTopics(topicsData)
       } catch (error) {
         message.error('获取主题列表失败')
@@ -55,15 +57,13 @@ export default function PostEditPage({ params }: { params: { id: string } }) {
       if (isNew) return
       try {
         setLoading(true)
-        const response = await fetch(`/api/posts/${params.id}`)
-        if (!response.ok) {
+        const post = await getPost(params.id)
+        if (!post) {
           throw new Error('获取文章详情失败')
         }
-        const post: PostWithRelations = await response.json()
-        console.log('文章详情：', post)
+        
         // 从 postTrees 中提取主题 ID
         const topicIds = post.postTrees?.map(pt => pt.topic.id) || []
-        console.log('主题 IDs：', topicIds)
 
         form.setFieldsValue({
           title: post.title,
@@ -88,22 +88,8 @@ export default function PostEditPage({ params }: { params: { id: string } }) {
   const onFinish = async (values: PostForm) => {
     try {
       setSubmitting(true)
-      const url = isNew ? '/api/posts' : `/api/posts/${params.id}`
-      const method = isNew ? 'POST' : 'PUT'
-      const data = isNew ? { ...values, id: generateId(), content } : { ...values, content }
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      })
-
-      if (!response.ok) {
-        throw new Error(`${isNew ? '创建' : '更新'}失败`)
-      }
-
+      const data = { ...values, content }
+      await upsertPost(params.id, data)
       message.success(`${isNew ? '创建' : '更新'}成功`)
       router.push('/dashboard/posts')
     } catch (error) {
@@ -153,10 +139,21 @@ export default function PostEditPage({ params }: { params: { id: string } }) {
             mode="multiple"
             allowClear
             placeholder="请选择主题"
-            options={topics?.map(topic => ({
+            options={topics.map(topic => ({
               label: topic.title,
               value: topic.id,
-            })) || []}
+              title: topic.description
+            }))}
+            optionRender={(option) => (
+              <Space>
+                <span>{option.data.label}</span>
+                {option.data.title && (
+                  <span style={{ color: '#999', fontSize: '12px' }}>
+                    ({option.data.title})
+                  </span>
+                )}
+              </Space>
+            )}
           />
         </Form.Item>
 
@@ -170,6 +167,13 @@ export default function PostEditPage({ params }: { params: { id: string } }) {
             value={content}
             onChange={(v) => setContent(v || '')}
           />
+        </Form.Item>
+
+        <Form.Item
+          name="published"
+          valuePropName="checked"
+        >
+          <Switch checkedChildren="已发布" unCheckedChildren="未发布" />
         </Form.Item>
 
         <Form.Item>

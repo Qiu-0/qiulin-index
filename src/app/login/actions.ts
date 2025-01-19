@@ -1,20 +1,16 @@
 'use server'
 
+import { login as authLogin } from '@/lib/auth'
+
 interface LoginData {
   username: string
   password: string
 }
 
 export async function login(data: LoginData) {
-  const res = await fetch('http://localhost:3000/api/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  })
-
-  if (!res.ok) {
+  const success = await authLogin(data.username, data.password)
+  if (!success) {
     throw new Error('Login failed')
   }
-
-  return res.json()
+  return { success: true }
 } 

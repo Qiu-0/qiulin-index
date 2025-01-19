@@ -2,45 +2,51 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Form, Input, Button, Card, Space, Select, message } from 'antd'
-import { useForm, Controller } from 'react-hook-form'
-import type { Topic } from '@prisma/client'
+import { Form, Input, Button, Card, Space, message, Select, Switch } from 'antd'
 import { MDXEditor } from '@/components/mdx-editor'
-import { createPost } from './actions'
+import { getTopics, upsertPost } from '../[id]/edit/actions'
 
 interface PostForm {
   title: string
   content: string
-  topicIds: string[]
   description?: string
+  published?: boolean
+  topicIds?: string[]
 }
 
-export default function NewPostPage() {
+interface TopicOption {
+  id: string
+  title: string
+  description?: string | null
+}
+
+export default function PostNewPage() {
   const router = useRouter()
-  const { control, handleSubmit } = useForm<PostForm>()
+  const [form] = Form.useForm<PostForm>()
   const [submitting, setSubmitting] = useState(false)
-  const [topics, setTopics] = useState<Topic[]>([])
+  const [topics, setTopics] = useState<TopicOption[]>([])
+  const [content, setContent] = useState('')
 
   // 获取所有可选的主题
   useEffect(() => {
     const fetchTopics = async () => {
       try {
-        const response = await fetch('/api/topics?pageSize=100')
-        const result = await response.json()
-        setTopics(result.data)
+        const topicsData = await getTopics()
+        setTopics(topicsData)
       } catch (error) {
         message.error('获取主题列表失败')
-        console.error(error)
+        console.error('获取主题列表错误：', error)
       }
     }
 
     fetchTopics()
   }, [])
 
-  const onSubmit = async (data: PostForm) => {
+  const onFinish = async (values: PostForm) => {
     try {
       setSubmitting(true)
-      await createPost(data)
+      const data = { ...values, content }
+      await upsertPost('new', data)
       message.success('创建成功')
       router.push('/dashboard/posts')
     } catch (error) {
@@ -53,65 +59,72 @@ export default function NewPostPage() {
 
   return (
     <Card title="新建文章">
-      <Form layout="vertical" onSubmitCapture={handleSubmit(onSubmit)} style={{ maxWidth: 800 }}>
-        <Controller
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={onFinish}
+        initialValues={{ published: false }}
+      >
+        <Form.Item
           name="title"
-          control={control}
-          rules={{ required: '请输入标题' }}
-          render={({ field, fieldState: { error } }) => (
-            <Form.Item 
-              label="标题" 
-              validateStatus={error ? 'error' : undefined}
-              help={error?.message}
-            >
-              <Input {...field} placeholder="请输入标题" />
-            </Form.Item>
-          )}
-        />
+          label="标题"
+          rules={[{ required: true, message: '请输入标题' }]}
+        >
+          <Input placeholder="请输入标题" />
+        </Form.Item>
 
-        <Controller
+        <Form.Item
           name="description"
-          control={control}
-          render={({ field }) => (
-            <Form.Item label="描述">
-              <Input.TextArea {...field} rows={4} placeholder="请输入描述" />
-            </Form.Item>
-          )}
-        />
+          label="描述"
+        >
+          <Input.TextArea rows={2} placeholder="请输入描述" />
+        </Form.Item>
 
-        <Controller
+        <Form.Item
           name="topicIds"
-          control={control}
-          render={({ field }) => (
-            <Form.Item label="所属主题">
-              <Select
-                mode="multiple"
-                allowClear
-                placeholder="请选择主题"
-                {...field}
-                options={topics.map((topic: Topic) => ({
-                  label: topic.title,
-                  value: topic.id,
-                }))}
-              />
-            </Form.Item>
-          )}
-        />
+          label="所属主题"
+          rules={[{ required: true, message: '请选择至少一个主题' }]}
+        >
+          <Select
+            mode="multiple"
+            allowClear
+            placeholder="请选择主题"
+            options={topics.map(topic => ({
+              label: topic.title,
+              value: topic.id,
+              title: topic.description
+            }))}
+            optionRender={(option) => (
+              <Space>
+                <span>{option.data.label}</span>
+                {option.data.title && (
+                  <span style={{ color: '#999', fontSize: '12px' }}>
+                    ({option.data.title})
+                  </span>
+                )}
+              </Space>
+            )}
+          />
+        </Form.Item>
 
-        <Controller
-          name="content"
-          control={control}
-          rules={{ required: '请输入内容' }}
-          render={({ field: { value, onChange }, fieldState: { error } }) => (
-            <Form.Item 
-              label="内容" 
-              validateStatus={error ? 'error' : undefined}
-              help={error?.message}
-            >
-              <MDXEditor value={value} onChange={onChange} />
-            </Form.Item>
-          )}
-        />
+        <Form.Item
+          label="内容"
+          required
+          help="支持 Markdown 格式"
+          rules={[{ required: true, message: '请输入内容' }]}
+        >
+          <MDXEditor
+            value={content}
+            onChange={(v) => setContent(v || '')}
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="published"
+          valuePropName="checked"
+        >
+          <Switch checkedChildren="已发布" unCheckedChildren="未发布" />
+        </Form.Item>
 
         <Form.Item>
           <Space>
