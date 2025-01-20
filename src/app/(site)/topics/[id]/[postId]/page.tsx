@@ -1,9 +1,7 @@
+import { extractHeadingsFromMarkdown, renderMarkdown } from "@/lib/markdown"
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
-import { Suspense } from "react"
-import { getPost, getTopic, getPublishedPosts } from "../../../actions"
-import { extractHeadingsFromMarkdown, renderMarkdown } from "@/lib/markdown"
-import { PostContent } from "../_components/post-content"
+import { getPost, getPublishedPosts, getTopic } from "../../../actions"
 import { TableOfContents } from "./toc"
 
 interface Props {
@@ -69,14 +67,21 @@ export default async function TopicPostPage({ params }: Props) {
         renderMarkdown(post.content)
     ])
 
-    console.log('html:', html)
-    console.log('headings:', headings)
 
     return (
         <div className="flex gap-6">
             {/* 中间：博客内容 */}
             <div className="flex-1 px-6 min-w-0">
-                <PostContent post={{ ...post, html }} />
+                <article className="prose dark:prose-invert max-w-none">
+                    <div className="not-prose mb-8">
+                        <h1 className="text-3xl font-bold tracking-tight">{post.title}</h1>
+                        {post.description && (
+                            <p className="mt-4 text-xl text-muted-foreground">{post.description}</p>
+                        )}
+                    </div>
+                    <div className="border-b my-8" />
+                    <div dangerouslySetInnerHTML={{ __html: html }} />
+                </article>
             </div>
 
             {/* 右侧：文章目录 */}
