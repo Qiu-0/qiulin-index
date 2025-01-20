@@ -216,6 +216,7 @@ export async function getPost(id: string) {
               select: {
                 id: true,
                 title: true,
+                description: true,
               }
             }
           }
