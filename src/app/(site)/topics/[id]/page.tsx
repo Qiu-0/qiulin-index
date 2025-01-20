@@ -1,74 +1,61 @@
 import type { Metadata } from "next"
-import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ChevronRight } from "lucide-react"
-import { getTopic } from "../../actions"
+import { Suspense } from "react"
+import { getPost, getTopic } from "../../actions"
+import { TopicTree } from "./_components/topic-tree"
+import { PostContent } from "./_components/post-content"
+import { TableOfContents } from "./_components/toc"
 
 interface Props {
-  params: { id: string }
+    params: { id: string }
+    searchParams: { postId?: string }
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const data = await getTopic(params.id)
-  if (!data) return {}
+    const data = await getTopic(params.id)
+    if (!data) return {}
 
-  return {
-    title: data.topic.title,
-    description: data.topic.description,
-  }
+    return {
+        title: data.topic.title,
+        description: data.topic.description,
+    }
 }
 
-function PostTree({ tree, level = 0 }: { tree: any; level?: number }) {
-  return (
-    <div className={level > 0 ? "ml-6" : ""}>
-      <Link
-        href={`/posts/${tree.post.id}`}
-        className="group flex items-center py-2 hover:text-primary"
-      >
-        <ChevronRight className="mr-2 h-4 w-4 flex-shrink-0" />
-        <span className="group-hover:underline">{tree.post.title}</span>
-      </Link>
-      {tree.children?.length > 0 && (
-        <div className="space-y-1">
-          {tree.children.map((child: any) => (
-            <PostTree key={child.id} tree={child} level={level + 1} />
-          ))}
-        </div>
-      )}
-    </div>
-  )
+async function PostData({ postId }: { postId: string }) {
+    const data = await getPost(postId)
+    if (!data?.post) return <PostContent />
+    return <PostContent initialPost={data.post} />
 }
 
-export default async function TopicPage({ params }: Props) {
-  const data = await getTopic(params.id)
-  if (!data) notFound()
+export default async function TopicPage({ params, searchParams }: Props) {
+    const data = await getTopic(params.id)
+    if (!data) notFound()
 
-  const { topic, postTrees } = data
+    const { topic, postTrees } = data
+    const postId = searchParams.postId || postTrees[0]?.post.id
 
-  return (
-    <div className="space-y-8">
-      <div className="space-y-4">
-        <div className="flex flex-wrap gap-2 mb-2">
-          {topic.categories.map((category: any) => (
-            <span
-              key={category.id}
-              className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary"
-            >
-              {category.name}
-            </span>
-          ))}
+    return (
+        <div className="flex gap-6 -mx-6">
+            {/* 左侧：博客列表（目录树） */}
+            <div className="w-64 flex-shrink-0 px-6 border-r min-h-[calc(100vh-8rem)]">
+                <TopicTree topic={topic} postTrees={postTrees} activePostId={postId} />
+            </div>
+
+            {/* 中间：博客内容 */}
+            <div className="flex-1 px-6 min-w-0">
+                <Suspense fallback={<div className="text-center py-12">加载中...</div>}>
+                    {postId ? <PostData postId={postId} /> : <PostContent />}
+                </Suspense>
+            </div>
+
+            {/* 右侧：文章目录 */}
+            <div className="w-64 flex-shrink-0 px-6 border-l min-h-[calc(100vh-8rem)]">
+                <div className="sticky top-20">
+                    <Suspense fallback={<div className="text-center py-4">加载目录...</div>}>
+                        {postId && <TableOfContents />}
+                    </Suspense>
+                </div>
+            </div>
         </div>
-        <h1 className="text-3xl font-bold tracking-tight">{topic.title}</h1>
-        {topic.description && (
-          <p className="text-muted-foreground">{topic.description}</p>
-        )}
-      </div>
-
-      <div className="space-y-1">
-        {postTrees.map((tree: any) => (
-          <PostTree key={tree.id} tree={tree} />
-        ))}
-      </div>
-    </div>
-  )
+    )
 } 

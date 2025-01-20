@@ -27,4 +27,5 @@
 - 数据库采用prisma结合mysql， 主键采用ulid
 - 管理端通过server action 处理请求， 展示端通过api 处理请求
 - 代码基于windows上的cursor开发
+- 从page页面拆分出的组件， 请放在与page目录同级的_components目录下
 # 请慢慢思考，设计合理的流程或步骤一步一步完成整个系统。

@@ -110,45 +110,23 @@ export async function getTopic(id: string) {
     const postTrees = await prisma.topicPostTree.findMany({
       where: {
         topicId: id,
-        parentId: null // 只获取顶层节点
       },
       select: {
         id: true,
         order: true,
-        post: {
+        parentId: true,
+        postId: true,
+        topic: {
           select: {
             id: true,
             title: true,
           }
         },
-        children: {
+        post: {
           select: {
             id: true,
-            order: true,
-            post: {
-              select: {
-                id: true,
-                title: true,
-              }
-            },
-            children: {
-              select: {
-                id: true,
-                order: true,
-                post: {
-                  select: {
-                    id: true,
-                    title: true,
-                  }
-                }
-              },
-              orderBy: {
-                order: "asc"
-              }
-            }
-          },
-          orderBy: {
-            order: "asc"
+            title: true,
+            published: true,
           }
         }
       },
@@ -156,8 +134,20 @@ export async function getTopic(id: string) {
         order: "asc"
       }
     })
+    console.log('postTrees: ',JSON.stringify(postTrees))
+    // 组装树结构
+    const buildTree = (nodes: any[], parentId: string | null = null): any[] => {
+      return nodes
+        .filter(node => node.parentId === parentId)
+        .map(node => ({
+          ...node,
+          children: buildTree(nodes, node.postId)
+        }))
+        .sort((a, b) => a.order - b.order)
+    }
 
-    return { topic, postTrees }
+    const treeData = buildTree(postTrees)
+    return { topic, postTrees: treeData }
   } catch (error) {
     console.error("Error fetching topic:", error)
     throw new Error("Failed to fetch topic")
@@ -207,13 +197,17 @@ export async function getPosts(page: number = 1) {
 
 export async function getPost(id: string) {
   try {
-    const post = await prisma.post.findUnique({
-      where: { id },
+    const post = await prisma.post.findFirst({
+      where: { 
+        id,
+        published: true 
+      },
       select: {
         id: true,
         title: true,
         content: true,
         description: true,
+        published: true,
         createdAt: true,
         postTrees: {
           take: 1,
