@@ -134,7 +134,7 @@ export async function getTopic(id: string) {
         order: "asc"
       }
     })
-    console.log('postTrees: ',JSON.stringify(postTrees))
+    
     // 组装树结构
     const buildTree = (nodes: any[], parentId: string | null = null): any[] => {
       return nodes
@@ -229,5 +229,31 @@ export async function getPost(id: string) {
   } catch (error) {
     console.error("Error fetching post:", error)
     throw new Error("Failed to fetch post")
+  }
+}
+
+export async function getPublishedPosts() {
+  try {
+    const posts = await prisma.post.findMany({
+      where: {
+        published: true,
+        postTrees: {
+          some: {} // 确保文章属于至少一个主题
+        }
+      },
+      select: {
+        id: true,
+        postTrees: {
+          select: {
+            topicId: true
+          }
+        }
+      }
+    })
+
+    return posts
+  } catch (error) {
+    console.error("Error fetching published posts:", error)
+    throw new Error("Failed to fetch published posts")
   }
 } 

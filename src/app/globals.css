@@ -74,4 +74,13 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  h1[id],
+  h2[id],
+  h3[id],
+  h4[id],
+  h5[id],
+  h6[id] {
+    scroll-margin-top: 100px; /* 根据你的头部导航高度调整此值 */
+  }
 }

@@ -1,8 +1,5 @@
-'use client'
-
-import { useState } from "react"
 import Link from "next/link"
-import { ChevronRight } from "lucide-react"
+import { ChevronDownIcon } from "lucide-react"
 
 interface PostTreeNode {
   id: string
@@ -31,42 +28,37 @@ interface Props {
     }[]
   }
   postTrees: PostTreeNode[]
-  activePostId?: string
+  currentPostId?: string
 }
 
-function PostTree({ tree, level = 0, activePostId }: { tree: PostTreeNode; level?: number; activePostId?: string }) {
+function PostTree({ tree, level = 0, currentPostId }: { tree: PostTreeNode; level?: number; currentPostId?: string }) {
   if (!tree.post.published) {
     return null
   }
 
-  const [isExpanded, setIsExpanded] = useState(true)
-  const isActive = tree.post.id === activePostId
+  const isActive = tree.post.id === currentPostId
   const publishedChildren = tree.children?.filter(child => child.post.published)
   const hasChildren = publishedChildren && publishedChildren.length > 0
 
   return (
     <div className={level > 0 ? "ml-4" : ""}>
       <div className="flex items-center">
-        <button
-          type="button"
-          onClick={() => setIsExpanded(!isExpanded)}
-          className={`mr-2 p-0.5 rounded-sm hover:bg-accent ${hasChildren ? "visible" : "invisible"}`}
-        >
-          <ChevronRight 
-            className={`h-4 w-4 flex-shrink-0 transition-transform ${isExpanded ? "rotate-90" : ""}`} 
-          />
-        </button>
+        {hasChildren ? (
+          <ChevronDownIcon className="h-4 w-4 flex-shrink-0 mr-2" />
+        ) : (
+          <div className="w-6" />
+        )}
         <Link
-          href={`/topics/${tree.topic.id}?postId=${tree.post.id}`}
+          href={`/topics/${tree.topic.id}/${tree.post.id}`}
           className={`group flex-1 py-2 hover:text-primary ${isActive ? "text-primary font-medium" : ""}`}
         >
           <span className="group-hover:underline line-clamp-1">{tree.post.title}</span>
         </Link>
       </div>
-      {hasChildren && isExpanded && publishedChildren && (
+      {hasChildren && publishedChildren && (
         <div className="space-y-1 mt-1">
           {publishedChildren.map((child) => (
-            <PostTree key={child.id} tree={child} level={level + 1} activePostId={activePostId} />
+            <PostTree key={child.id} tree={child} level={level + 1} currentPostId={currentPostId} />
           ))}
         </div>
       )}
@@ -74,7 +66,7 @@ function PostTree({ tree, level = 0, activePostId }: { tree: PostTreeNode; level
   )
 }
 
-export function TopicTree({ topic, postTrees, activePostId }: Props) {
+export function TopicTree({ topic, postTrees, currentPostId }: Props) {
   const publishedPostTrees = postTrees.filter(tree => tree.post.published)
 
   return (
@@ -98,7 +90,7 @@ export function TopicTree({ topic, postTrees, activePostId }: Props) {
 
       <div className="space-y-1">
         {publishedPostTrees.map((tree) => (
-          <PostTree key={tree.id} tree={tree} activePostId={activePostId} />
+          <PostTree key={tree.id} tree={tree} currentPostId={currentPostId} />
         ))}
       </div>
     </div>
