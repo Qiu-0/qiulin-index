@@ -257,4 +257,49 @@ export async function getPublishedPosts() {
     console.error("Error fetching published posts:", error)
     throw new Error("Failed to fetch published posts")
   }
+}
+
+export async function getTopicsWithCategories() {
+  try {
+    const categories = await prisma.category.findMany({
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        topics: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            categories: {
+              select: {
+                id: true,
+                name: true,
+              }
+            },
+            _count: {
+              select: {
+                postTrees: true
+              }
+            }
+          },
+          orderBy: {
+            postTrees: {
+              _count: "desc"
+            }
+          }
+        }
+      },
+      orderBy: {
+        topics: {
+          _count: "desc"
+        }
+      }
+    })
+
+    return { categories }
+  } catch (error) {
+    console.error("Error fetching topics with categories:", error)
+    throw new Error("Failed to fetch topics with categories")
+  }
 } 
